@@ -47,7 +47,7 @@ class Event:
 
 
 class Engine( watchdog.events.FileSystemEventHandler ):
-	DEFAULT_CFG = [r'D:\disk\Projects\pyMediaMonitor\TEST_DIR']
+	DEFAULT_CFG = [r'D:\disk\Projects\pyMediaMonitor\WATCH_DIR']
 	DEFAULT_CFG_NAME = 'cfg'
 
 	def __init__( self, outFunc = None ):

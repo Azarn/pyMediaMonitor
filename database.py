@@ -7,7 +7,7 @@ import os.path
 from fileutils import get_size, get_created, get_hash
 
 class DataBase:
-	EMPTY_DB = { 'dir': 'TEST_DIR',
+	EMPTY_DB = { 'dir': 'WATCH_DIR',
 				 'tags': {},
 				 'media': [] }
 

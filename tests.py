@@ -13,8 +13,8 @@ from fileutils import get_size, get_created, get_hash, get_file_and_dir
 
 
 class EmptyEngineClass( unittest.TestCase ):
-	DEFAULT_CFG = [ r'D:\disk\Projects\pyMediaMonitor\Data' ]
-	DEFAULT_CFG_DB = { 'dir': 'Data',
+	DEFAULT_CFG = [ r'D:\disk\Projects\pyMediaMonitor\TEST_DIR' ]
+	DEFAULT_CFG_DB = { 'dir': 'TEST_DIR',
 					   'tags': {},
 					   'media': [] }
 	def setUp( self ):
@@ -270,30 +270,30 @@ class TestEngineCfg( unittest.TestCase ):
 		self.assertEqual( self.engine.cfg, self.engine.DEFAULT_CFG )
 
 	def test_write_cfg( self ):
-		self.engine.writeCfg( 'Data/test_cfg_2' )
-		self.engine.loadCfg( 'Data/test_cfg_2' )
+		self.engine.writeCfg( 'TEST_DIR/test_cfg_2' )
+		self.engine.loadCfg( 'TEST_DIR/test_cfg_2' )
 		self.assertEqual( self.engine.cfg, self.engine.DEFAULT_CFG )
-		os.unlink( 'Data/test_cfg_2' )
+		os.unlink( 'TEST_DIR/test_cfg_2' )
 
 
 class TestFileUtils( unittest.TestCase ):
 	testData = b'12345689abcdefghijklmnopqrsuvwxyz_'
 
 	def setUp( self ):
-		with open( 'Data/tmp file', 'wb' ) as f:
+		with open( 'TEST_DIR/tmp file', 'wb' ) as f:
 			f.write( self.testData )
 
 	def tearDown( self ):
-		os.unlink( 'Data/tmp file' )
+		os.unlink( 'TEST_DIR/tmp file' )
 
 	def test_get_size( self ):
-		self.assertEqual( get_size( 'Data/tmp file' ), len( self.testData ) )
+		self.assertEqual( get_size( 'TEST_DIR/tmp file' ), len( self.testData ) )
 
 	def test_get_hash( self ):
-		self.assertEqual( get_hash( 'Data/tmp file' ), 'bf5c8c903440047e4bcd6f532b8d662a46144b7709e9c633734fd8c127df8c17' )
+		self.assertEqual( get_hash( 'TEST_DIR/tmp file' ), 'bf5c8c903440047e4bcd6f532b8d662a46144b7709e9c633734fd8c127df8c17' )
 
 	def test_get_created( self ):
-		self.assertTrue( get_created( 'Data/tmp file' ) - int( time.time() ) < 60 )			# Винда как-то косячит, поэтому время создания немного отстаёт. (кэш?)
+		self.assertTrue( get_created( 'TEST_DIR/tmp file' ) - int( time.time() ) < 60 )			# Винда как-то косячит, поэтому время создания немного отстаёт. (кэш?)
 
 	def test_get_file_and_dir_with_file( self ):
 		f, d = get_file_and_dir( 'C:/test_dir/test_file', 'C:/' )
@@ -317,7 +317,7 @@ class TestFileUtils( unittest.TestCase ):
 
 
 class TestDB( unittest.TestCase ):
-	dbData = {	'dir': 'Data',
+	dbData = {	'dir': 'TEST_DIR',
 				'tags': { 'test_tag_1': 1,
 					 	  'test  tag 2': 2,
 					 	  'test!/|-@ tag    3': 1,
@@ -329,7 +329,7 @@ class TestDB( unittest.TestCase ):
 			  				  'url': 'http://poniez.net/images/2012/07/16/3Bz2F.jpg',
 			  				  'hash': None, 'google': 'мир пони' },
 			  				{ 'file': '3.jpg', 'dir': 'тест контент 3', 'size': 5784745, 'created': 1389078965, 'tags': { 'тест тэг 4', 'test  tag 2' },
-			  				  'url': 'https://static1.e621.net/data/sample/01/76/017691130342c69beb81ce71e2399df0.jpg',
+			  				  'url': 'https://static1.e621.net/TEST_DIR/sample/01/76/017691130342c69beb81ce71e2399df0.jpg',
 			  				  'hash': None, 'google': 'luna celestia' },
 			  				{ 'file': '4.jpg', 'dir': 'unknown dir', 'size': 5784745, 'created': 1389078955, 'tags': { 'тест тэг 4' },
 			  				  'url': 'https://pp.vk.me/c409823/v409823018/8ad0/9_S0XT7uEcQ.jpg',
@@ -345,13 +345,13 @@ class TestDB( unittest.TestCase ):
 		del self.db
 
 	def test_load_db( self ):
-		with open( 'Data/test_db', 'wb' ) as f:
+		with open( 'TEST_DIR/test_db', 'wb' ) as f:
 			pickle.dump( self.dbData, f )
 		self.db.load_db( 'xxxxxxxxxxxxxxxxxxxxxxx' )
 		self.assertEqual( self.db.db, self.db.EMPTY_DB )
-		self.db.load_db( 'Data/test_db' )
+		self.db.load_db( 'TEST_DIR/test_db' )
 		self.assertEqual( self.db.db, self.dbData )
-		os.unlink( 'Data/test_db' )
+		os.unlink( 'TEST_DIR/test_db' )
 
 	def test_find_file( self ):
 		self.assertEqual( self.db.find( file = '3.jpg' ), [ self.dbData['media'][2] ] )
