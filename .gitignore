@@ -37,3 +37,6 @@ nosetests.xml
 
 # Sublime Text 2 project files
 *.sublime*
+
+# Developing dir
+WORK_DIR
