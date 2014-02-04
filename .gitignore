@@ -39,4 +39,4 @@ nosetests.xml
 *.sublime*
 
 # Developing dir
-WORK_DIR
+WATCH_DIR
