@@ -159,32 +159,38 @@ class Engine( watchdog.events.FileSystemEventHandler ):
 		if len( res_path ) or basicAction == Event.ACTION.RENAMED:
 			basicEvent.isInDB = True
 
-		if not isDir and ( basicAction == Event.ACTION.MISSING or basicAction == Event.ACTION.NEW ):
+		if not isDir and ( basicAction == Event.ACTION.MISSING or basicAction == Event.ACTION.NEW or basicAction == Event.ACTION.RENAMED ):
 			if len( res_path ) > 1:
 				raise RuntimeError( 'В базе данных сразу две записи об одном файле! Нужна полная проверка базы.' )
 			if os.path.exists( path ):
 				f_hash = fileutils.get_hash( path )
 				res_hash = self.db.find( hash = f_hash )
-				print( '[res_hash]:', res_hash )
-				print( '[res_path]:', res_path )
+				#print( '[res_hash]:', res_hash )
+				#print( '[res_path]:', res_path )
 				if len( res_path ):
-					if res_path[0]['hash'] != f_hash:						# Файл есть на диске и в базе не совпал хэш.
+					if res_path[0]['hash'] != f_hash:								# Файл есть на диске и в базе не совпал хэш.
 						basicEvent.action = Event.ACTION.BAD_HASH
 						basicEvent.info = res_path
+					elif basicAction == Event.ACTION.RENAMED:
+						basicEvent.action = basicAction
+						basicEvent.info = fileutils.get_file_and_dir( info, root, isDir )
 				elif len( res_hash ):												# Файла в базе нет, но есть другой с таким же значением хэша.
 					basicEvent.isInDB = True
 					basicEvent.action = Event.ACTION.DUPLICATE
 					basicEvent.info = res_hash
 				else:
 					basicEvent.action = Event.ACTION.NEW							# Файл есть над диске, но в базе его нет.
+					if basicAction == Event.ACTION.RENAMED:
+						new_f, new_d = fileutils.get_file_and_dir( info, root, isDir )
+						basicEvent.fileName = new_f
+						basicEvent.directory = new_d
 					basicEvent.info = f_hash
 			elif len( res_path ):													# Файла на диске нет, но в базе есть.
 				basicEvent.action = Event.ACTION.MISSING
 		else:
 			basicEvent.action = basicAction
-			if basicAction == Event.ACTION.RENAMED:
-				basicEvent.info = fileutils.get_file_and_dir( info, root, isDir )
-		print( '[EVENT]:', basicEvent )
+				 
+		#print( '[EVENT]:', basicEvent )
 		return basicEvent
 
 

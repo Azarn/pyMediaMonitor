@@ -149,6 +149,9 @@ class TestProcessEvent( EmptyEngineClass ):
 			unlink_path.assert_called_once_with( ev.path )
 			self.assertEqual( self.engine.ignoreFiles, [ev.path] )
 
+	def test_RENAMED( self ):
+		pass
+
 
 class TestPrepareEvent( EmptyEngineClass ):
 	def test_NEW_file_not_in_db_not_exists( self ):
@@ -261,6 +264,27 @@ class TestPrepareEvent( EmptyEngineClass ):
 		ev = Event( 'filename', '', False, self.DEFAULT_CFG[0] )
 		ev.action = Event.ACTION.NEW
 		self.assertRaises( RuntimeError, self.engine.prepareEvent, ev.path, self.DEFAULT_CFG[0], ev.action )
+
+	def test_RENAMED_file_not_in_db( self ):
+		ev = Event( 'filename', '', False, self.DEFAULT_CFG[0] )
+		ev.action = Event.ACTION.RENAMED
+		with unittest.mock.patch( 'os.path.exists', return_value = True ) as exists_test:
+			new_path = os.path.join( self.DEFAULT_CFG[0], 'new_filename' )
+			newEv = self.engine.prepareEvent( ev.path, self.DEFAULT_CFG[0], ev.action, new_path )
+			exists_test.assert_called_once_with( ev.path )
+		self.assertEqual( Event.ACTION.NEW, newEv.action )	# Файл был переименован, но в базе его нет - новый файл
+		self.assertEqual( new_path, newEv.path )	
+
+	def test_RENAMED_file_already_in_db( self ):
+		self.engine.db.add( file = 'filename', hash = None )
+		ev = Event( 'filename', '', False, self.DEFAULT_CFG[0] )
+		ev.action = Event.ACTION.RENAMED
+		with unittest.mock.patch( 'os.path.exists', return_value = True ) as exists_test:
+			new_path = os.path.join( self.DEFAULT_CFG[0], 'new_filename' )
+			newEv = self.engine.prepareEvent( ev.path, self.DEFAULT_CFG[0], ev.action, new_path )
+			exists_test.assert_called_once_with( ev.path )
+		self.assertEqual( Event.ACTION.RENAMED, newEv.action )	# Файл был переименован, в базе есть - нужно обновить базу
+		self.assertEqual( get_file_and_dir( new_path, self.DEFAULT_CFG[0], False ), newEv.info )
 
 
 class TestEngineCfg( unittest.TestCase ):

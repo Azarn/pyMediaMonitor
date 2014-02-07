@@ -28,21 +28,21 @@ def get_file_and_dir( path, root, is_dir = False ):
 	head, directory = os.path.split( head )
 	return fileName, directory
 
-@wait_for_file
+#@wait_for_file
 def get_size( fileName ):
 	try:
 		return os.path.getsize( fileName )
 	except FileNotFoundError:
 		return None
 
-@wait_for_file
+#@wait_for_file
 def get_created( fileName ):
 	try:
 		return int( os.path.getctime( fileName ) )
 	except FileNotFoundError:
 		return None
 
-@wait_for_file
+#@wait_for_file
 def get_hash( fileName ):
 	m = hashlib.sha256()
 	try:

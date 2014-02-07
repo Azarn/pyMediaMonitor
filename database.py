@@ -50,7 +50,7 @@ class DataBase:
 			search_data['dir'] = ''
 		for elem in self.find( **search_data ):
 			elem.update( update_data )
-		print( 'DB_UPDATE:', 'In', search_data, 'Data:', update_data )
+		#print( 'DB_UPDATE:', 'In', search_data, 'Data:', update_data )
 
 	def add( self, **data ):
 		if not self.REQUIRED_FIELDS < set( data.keys() ) and set( data.keys() ) != self.REQUIRED_FIELDS:
@@ -70,7 +70,7 @@ class DataBase:
 			self.db['tags'][t] = self.db['tags'].get( t, 0 ) + 1	# TODO: Использовать здесь defaultdict
 		for i in self.DEFAULT_NONE_ITEMS:
 			data[i] = data.get( i )
-		print( 'DB_ADD:', data )
+		#print( 'DB_ADD:', data )
 		self.db['media'].append( data )
 
 	def remove( self, **pattern ):
