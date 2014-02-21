@@ -33,7 +33,7 @@ class DataBase:
 				if k == 'tags':
 					if v < i['tags']:										# если v подмножество i['tags']
 						continue
-				elif flags.get( 're', True ) and type( v ) is str and i[k] != None:
+				elif flags.get( 're', False ) and type( v ) is str and i[k] != None:
 					#print( '[DEBUG]:', v, i[k], i, '[/DEBUG]' )
 					if re.search( v, i[k] ) != None:
 						continue
@@ -44,8 +44,6 @@ class DataBase:
 		return res
 
 	def update( self, search_data, update_data ):
-		if not self.REQUIRED_FIELDS < set( search_data.keys() ) and set( search_data.keys() ) != self.REQUIRED_FIELDS:
-			raise NameError( 'Обязательные аргументы не были переданы! Нужны как минимум: ' + ','.join( self.REQUIRED_FIELDS ) )
 		if not search_data.get( 'dir' ):
 			search_data['dir'] = ''
 		for elem in self.find( **search_data ):

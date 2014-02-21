@@ -28,13 +28,8 @@ class EmptyEngineClass( unittest.TestCase ):
 
 
 ########################################################################
-# TODO: Test info in prepareEvent						   			   #
-# TODO: Test RENAMED in prepareEvent (file and directory)  			   #
-# TODO: Test RENAMED in processEvent (file and directory)  			   #
-# TODO: Test flags in find in database					   			   #
-# TODO: Test update in database (file and directory)	   			   #
-# TODO: Do something with root argument in updateAllInPath 			   #
-# TODO: Make prepareEvent and processEvent deal with UPDATED event 	   #
+# TODO: Реализовать обработку множества путей в cfg					   #
+# TODO: Rewrite flags in database to deal with each value. (+or/and)   #
 ########################################################################
 
 
@@ -118,8 +113,8 @@ class TestEngineTasks( EmptyEngineClass ):
 
 
 class TestProcessEvent( EmptyEngineClass ):
-	def construct_event( self, action, d = '', isdir = False ):
-		ev = Event( 'filename', d, isdir, self.DEFAULT_CFG[0] )
+	def construct_event( self, action, d = '', isdir = False, name = 'filename' ):
+		ev = Event( name, d, isdir, self.DEFAULT_CFG[0] )
 		ev.action = action
 		return ev
 
@@ -149,8 +144,35 @@ class TestProcessEvent( EmptyEngineClass ):
 			unlink_path.assert_called_once_with( ev.path )
 			self.assertEqual( self.engine.ignoreFiles, [ev.path] )
 
-	def test_RENAMED( self ):
-		pass
+	def test_UPDATED_file( self ):
+		self.engine.db.add( file = 'filename', hash = 'xxx' )
+		ev = Event( 'filename', '', False, self.DEFAULT_CFG[0], 'new_hash' )
+		ev.action = Event.ACTION.UPDATED
+		self.engine.processEvent( ev )
+		elem = self.engine.db.find( hash = 'new_hash' )
+		self.assertEqual( len( self.engine.db.find( hash = 'xxx' ) ), 0 )
+		self.assertEqual( len( elem ), 1 )
+		self.assertEqual( elem[0]['file'], ev.fileName )
+
+	def test_RENAMED_file( self ):
+		self.engine.db.add( file = 'filename', hash = 'xxx' )
+		ev = self.construct_event( Event.ACTION.RENAMED )
+		ev.info = get_file_and_dir( os.path.join( self.DEFAULT_CFG[0], 'new_filename' ), self.DEFAULT_CFG[0], False )
+		self.engine.processEvent( ev )
+		self.assertEqual( len( self.engine.db.find( file = 'new_filename', hash = 'xxx' ) ), 1 )
+		#xxx = self.engine.db.find( file = 'filename', hash = 'xxx' )
+		self.assertEqual( len( self.engine.db.find( file = 'filename', hash = 'xxx' ) ), 0 )
+
+	def test_RENAMED_dir( self ):
+		self.engine.db.add( file = 'filename', dir = 'dir', hash = 'xxx' )
+		self.engine.db.add( file = 'filename_2', dir = 'dir', hash = 'xxx' )
+		ev = self.construct_event( Event.ACTION.RENAMED, 'dir', isdir = True, name = '' )
+		ev.info = get_file_and_dir( os.path.join( self.DEFAULT_CFG[0], 'new_dir' ), self.DEFAULT_CFG[0], True )
+		self.engine.processEvent( ev )
+		self.assertEqual( len( self.engine.db.find( file = 'filename', dir = 'dir', hash = 'xxx' ) ), 0 )
+		self.assertEqual( len( self.engine.db.find( file = 'filename_2', dir = 'dir', hash = 'xxx' ) ), 0 )
+		self.assertEqual( len( self.engine.db.find( file = 'filename', dir = 'new_dir', hash = 'xxx' ) ), 1 )
+		self.assertEqual( len( self.engine.db.find( file = 'filename_2', dir = 'new_dir', hash = 'xxx' ) ), 1 )
 
 
 class TestPrepareEvent( EmptyEngineClass ):
@@ -284,7 +306,51 @@ class TestPrepareEvent( EmptyEngineClass ):
 			newEv = self.engine.prepareEvent( ev.path, self.DEFAULT_CFG[0], ev.action, new_path )
 			exists_test.assert_called_once_with( ev.path )
 		self.assertEqual( Event.ACTION.RENAMED, newEv.action )	# Файл был переименован, в базе есть - нужно обновить базу
+		self.assertEqual( ev.path, newEv.path )
 		self.assertEqual( get_file_and_dir( new_path, self.DEFAULT_CFG[0], False ), newEv.info )
+
+	def test_RENAMED_dir( self ):
+		ev = Event( '', 'dir', True, self.DEFAULT_CFG[0] )
+		ev.action = Event.ACTION.RENAMED
+		with unittest.mock.patch( 'os.path.isdir', return_value = True ) as isdir_test:
+			new_path = os.path.join( self.DEFAULT_CFG[0], 'new_dir' )
+			newEv = self.engine.prepareEvent( ev.path, self.DEFAULT_CFG[0], ev.action, new_path )
+			isdir_test.assert_called_once_with( ev.path )
+		self.assertEqual( Event.ACTION.RENAMED, newEv.action )	# Папка была переименована, в базе есть - нужно обновить базу
+		self.assertEqual( new_path, newEv.info )
+
+	def test_UPDATED_file_not_in_db( self ):
+		ev = Event( 'filename', '', False, self.DEFAULT_CFG[0] )
+		ev.action = Event.ACTION.UPDATED
+		with unittest.mock.patch( 'os.path.exists', return_value = True ) as exists_test:
+			newEv = self.engine.prepareEvent( ev.path, self.DEFAULT_CFG[0], ev.action )
+			exists_test.assert_called_once_with( ev.path )
+		self.assertEqual( newEv.action, Event.ACTION.NEW )
+		self.assertEqual( newEv.isInDB, False )
+
+	def test_UPDATED_file_already_in_db_diff_hash( self ):
+		self.engine.db.add( file = 'filename', hash = 'old' )
+		ev = Event( 'filename', '', False, self.DEFAULT_CFG[0] )
+		ev.action = Event.ACTION.UPDATED
+		with unittest.mock.patch( 'fileutils.get_hash', return_value = 'new' ) as hash_test:
+			with unittest.mock.patch( 'os.path.exists', return_value = True ) as exists_test:
+				newEv = self.engine.prepareEvent( ev.path, self.DEFAULT_CFG[0], ev.action )
+				exists_test.assert_called_once_with( ev.path )
+				hash_test.assert_called_once_with( ev.path )
+		ev.isInDB = True
+		ev.info = 'new'
+		self.assertEqual( ev, newEv )
+
+	def test_UPDATED_file_already_in_db_diff_hash( self ):
+		self.engine.db.add( file = 'filename', hash = 'same' )
+		ev = Event( 'filename', '', False, self.DEFAULT_CFG[0] )
+		ev.action = Event.ACTION.UPDATED
+		with unittest.mock.patch( 'fileutils.get_hash', return_value = 'same' ) as hash_test:
+			with unittest.mock.patch( 'os.path.exists', return_value = True ) as exists_test:
+				newEv = self.engine.prepareEvent( ev.path, self.DEFAULT_CFG[0], ev.action )
+				exists_test.assert_called_once_with( ev.path )
+				hash_test.assert_called_once_with( ev.path )
+		self.assertEqual( newEv.action, Event.ACTION.NOT_PROCESSING )
 
 
 class TestEngineCfg( unittest.TestCase ):
@@ -393,7 +459,7 @@ class TestDB( unittest.TestCase ):
 		self.assertEqual( self.db.find( tags = {'test  tag 2'} ), [ self.dbData['media'][1], self.dbData['media'][2] ] )
 		
 	def test_find_url_regex( self ):
-		self.assertEqual( self.db.find( url = r'\.net/' ), [ self.dbData['media'][1], self.dbData['media'][2] ] )
+		self.assertEqual( self.db.find( url = r'\.net/', flags = {'re': True} ), [ self.dbData['media'][1], self.dbData['media'][2] ] )
 		
 	def test_find_hash( self ):
 		self.assertEqual( self.db.find( hash = None ), [ self.dbData['media'][0], self.dbData['media'][1], self.dbData['media'][2], self.dbData['media'][3] ] )
@@ -402,7 +468,7 @@ class TestDB( unittest.TestCase ):
 		self.assertEqual( self.db.find( google = None ), [ self.dbData['media'][3] ] )
 
 	def test_find_both_hash_url( self ):
-		self.assertEqual( self.db.find( hash = None, url = 'net' ), [ self.dbData['media'][1], self.dbData['media'][2] ] )
+		self.assertEqual( self.db.find( hash = None, url = 'net', flags = {'re': True} ), [ self.dbData['media'][1], self.dbData['media'][2] ] )
 
 	def test_add( self ):
 		self.db.add( file = 'test', hash = 'xxx' )
@@ -432,6 +498,30 @@ class TestDB( unittest.TestCase ):
 		self.assertNotIn( self.dbData['media'][0], self.db.db['media'] )
 		self.assertEqual( self.db.db['tags']['тест тэг 4'], self.dbData['tags']['тест тэг 4'] - 1 )
 		self.assertNotIn( 'test!/|-@ tag    3', self.db.db['tags'].keys() )
+
+	def test_update_file( self ):
+		self.db.add( file = 'filename', hash = 'xxx' )
+		self.db.update( {'file': 'filename'}, {'file': 'new_filename', 'hash': 'new'} )
+		elem = self.db.find( file = 'new_filename', hash = 'new' )
+		self.assertEqual( len( self.db.find( hash = 'xxx' ) ), 0 )
+		self.assertEqual( len( elem ), 1 )
+		self.assertEqual( elem[0]['hash'], 'new' )
+
+	def test_update_dir( self ):
+		self.db.add( file = 'filename_1', dir = 'dir', hash = 'xxx' )
+		self.db.add( file = 'filename_2', dir = 'dir', hash = 'xxx2' )
+		self.db.update( {'dir': 'dir'}, {'dir': 'new_dir'} )
+		elem = self.db.find( dir = 'new_dir' )
+		self.assertEqual( len( self.db.find( dir = 'dir' ) ), 0 )
+		self.assertEqual( len( elem ), 2 )
+
+	def test_re_flag( self ):
+		elem = self.db.find( file = '.jpg', flags = { 're': True })
+		self.assertEqual( len( elem ), 3 )
+		elem = self.db.find( file = '.jpg', flags = { 're': False })
+		self.assertEqual( len( elem ), 0 )
+		elem = self.db.find( file = '.jpg' )
+		self.assertEqual( len( elem ), 0 )
 
 if __name__ == "__main__":
 	unittest.main()

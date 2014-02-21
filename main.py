@@ -47,7 +47,8 @@ class Event:
 
 
 class Engine( watchdog.events.FileSystemEventHandler ):
-	DEFAULT_CFG = [r'D:\disk\Projects\pyMediaMonitor\WATCH_DIR']
+	#DEFAULT_CFG = [r'D:\disk\Projects\pyMediaMonitor\WATCH_DIR']
+	DEFAULT_CFG = [r'D:\disk\Pictures\ponies']
 	DEFAULT_CFG_NAME = 'cfg'
 
 	def __init__( self, outFunc = None ):
@@ -142,14 +143,20 @@ class Engine( watchdog.events.FileSystemEventHandler ):
 			elif event.action == Event.ACTION.DUPLICATE:
 				self.ignoreFiles.append( event.path )
 				os.unlink( event.path )
+			elif event.action == Event.ACTION.UPDATED:
+				self.db.update( { 'file': event.fileName, 'dir': event.directory },
+								{ 'hash': event.info } )
 			elif event.action == Event.ACTION.RENAMED:
 				if event.isDir:
-					raise NotImplementedError( "Don't know what to do with RENAMED dir!" )
+					self.db.update( { 'dir': event.directory },
+									{ 'dir': event.info[1] } )
 				else:
+					#self.ignoreFiles.append( event.info[0] )
 					self.db.update( { 'file': event.fileName, 'dir': event.directory },
 									{ 'file': event.info[0], 'dir': event.info[1] } )
 			else:
-				raise NotImplementedError( 'processEvent called with "{0}"!'.format( event ) )
+				pass
+				#raise NotImplementedError( 'processEvent called with "{0}"!'.format( event ) )
 
 	def prepareEvent( self, path, root, basicAction, info = None ):													# Создаем Event
 		isDir = os.path.isdir( path )
@@ -159,18 +166,20 @@ class Engine( watchdog.events.FileSystemEventHandler ):
 		if len( res_path ) or basicAction == Event.ACTION.RENAMED:
 			basicEvent.isInDB = True
 
-		if not isDir and ( basicAction == Event.ACTION.MISSING or basicAction == Event.ACTION.NEW or basicAction == Event.ACTION.RENAMED ):
+		if not isDir and ( basicAction in (Event.ACTION.MISSING, Event.ACTION.NEW, Event.ACTION.RENAMED, Event.ACTION.UPDATED) ):
 			if len( res_path ) > 1:
 				raise RuntimeError( 'В базе данных сразу две записи об одном файле! Нужна полная проверка базы.' )
 			if os.path.exists( path ):
 				f_hash = fileutils.get_hash( path )
 				res_hash = self.db.find( hash = f_hash )
-				#print( '[res_hash]:', res_hash )
-				#print( '[res_path]:', res_path )
 				if len( res_path ):
 					if res_path[0]['hash'] != f_hash:								# Файл есть на диске и в базе не совпал хэш.
-						basicEvent.action = Event.ACTION.BAD_HASH
-						basicEvent.info = res_path
+						if basicAction == Event.ACTION.UPDATED:
+							basicEvent.action = Event.ACTION.UPDATED
+							basicEvent.info = f_hash
+						else:
+							basicEvent.action = Event.ACTION.BAD_HASH				# Файл не был модифицирован, а значит это дубль.
+							basicEvent.info = res_path
 					elif basicAction == Event.ACTION.RENAMED:
 						basicEvent.action = basicAction
 						basicEvent.info = fileutils.get_file_and_dir( info, root, isDir )
@@ -203,13 +212,17 @@ class Engine( watchdog.events.FileSystemEventHandler ):
 			evType = Event.ACTION.MISSING
 		elif isinstance( event, watchdog.events.FileMovedEvent ):
 			evType = Event.ACTION.RENAMED
-			info = event.dest_path														# TODO: Это какой-то кривоватый дизайн, нужно отрефакторить
+			info = event.dest_path								
+		elif isinstance( event, watchdog.events.FileModifiedEvent ):
+			evType = Event.ACTION.UPDATED
 		else:
 			return
 		if event.src_path in self.ignoreFiles:
 			self.ignoreFiles.remove( event.src_path )
 			return
-		self.processEvent( self.prepareEvent( event.src_path, self.cfg[0], evType, info ) )	# TODO: Реализовать обработку множества путей в cfg
+		else:
+			print( event.src_path, self.ignoreFiles )
+		self.processEvent( self.prepareEvent( event.src_path, self.cfg[0], evType, info ) )	
 
 
 if __name__ == '__main__':
